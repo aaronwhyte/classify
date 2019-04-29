@@ -16,6 +16,8 @@ func check(e error) {
 }
 
 func main() {
+	identifierRe := `[A-Za-z0-9_]+`
+
 	pathFlag := flag.String("path", "ERROR", "Path of the file to scan")
 	flag.Parse()
 
@@ -34,7 +36,7 @@ func main() {
 
 
     // Look for a class and the ctor params
-    re := regexp.MustCompile(`function (.*)\((.*)\) {`)
+    re := regexp.MustCompile(`function (` + identifierRe + `)\((.*)\) \{`)
     result := re.FindStringSubmatch(js);
     clazz := ""
     ctorParams := ""
@@ -52,7 +54,7 @@ func main() {
 
 
     // is there a superclass?
-    re = regexp.MustCompile(`extends {(.*)}`)
+    re = regexp.MustCompile(`extends {(` + identifierRe + `)}`)
     result = re.FindStringSubmatch(js)
     sup := ""
     if len(result) > 0 {
@@ -67,8 +69,8 @@ func main() {
 		//   constructor(ctorParams)
 		js = strings.Replace(js,
 			"function " + clazz + "(" + ctorParams + ")",
-			"class " + clazz + 
-				"\n  constructor(" + ctorParams + ")",
+			"class " + clazz + " {\n" +
+				"  constructor(" + ctorParams + ")",
 			1)
 	} else {
 		// take care of a bunch of superclass stuff...
@@ -78,8 +80,8 @@ func main() {
 		//   constructor(ctorParams)
 		js = strings.Replace(js,
 			"function " + clazz + "(" + ctorParams + ")",
-			"class " + clazz + " extends " + sup +
-				"\n  constructor(" + ctorParams + ")",
+			"class " + clazz + " extends " + sup + " {\n" +
+				"  constructor(" + ctorParams + ")",
 			1)
 		
 		// replace calls to superclass ctor
@@ -107,7 +109,7 @@ func main() {
 		// ==>
  		// super.beep(superblah);
  		for {
-		    re = regexp.MustCompile(sup + `\.prototype\.(.*)\.call\(this\,?(.*)\);`)
+		    re = regexp.MustCompile(sup + `\.prototype\.(` + identifierRe + `)\.call\(this\,?(.*)\);`)
 		    result = re.FindStringSubmatch(js)
 		    if len(result) > 0 {
 		    	meth := strings.TrimSpace(result[1])
@@ -125,7 +127,7 @@ func main() {
 	// replace "Foo.prototype.bar = function(blah)"
 	// with "bar(blah)"
 	for {
-	    re = regexp.MustCompile(clazz + `\.prototype\.(.*) *= *function.*\((.*)\)`)
+	    re = regexp.MustCompile(clazz + `\.prototype\.(` + identifierRe + `) *= *function.*\((.*)\)`)
 	    result = re.FindStringSubmatch(js)
 	    if len(result) > 0 {
 	    	meth := strings.TrimSpace(result[1])
@@ -139,16 +141,33 @@ func main() {
 	    }
 	}
 
+	// replace "Foo.meth = function(params)"
+	// with "static meth(params)"
+	for {
+	    re = regexp.MustCompile(`\n` + clazz + `\.(` + identifierRe + `) += +function\((.*)\)`)
+	    result = re.FindStringSubmatch(js)
+	    if len(result) > 0 {
+	    	meth := result[1]
+	    	args := result[2]
+	    	js = strings.Replace(js,
+	    		result[0],
+	    		"\nstatic " + meth + "(" + args + ")",
+	    		1)
+	    } else {
+	    	break
+	    }
+	}
+
 	// replace "Foo.SOMETHING"
 	// with "static SOMETHING"
 	for {
-	    re = regexp.MustCompile(clazz + `\.(.*)`)
+	    re = regexp.MustCompile(`\n` + clazz + `\.(` + identifierRe + `)`)
 	    result = re.FindStringSubmatch(js)
 	    if len(result) > 0 {
 	    	something := result[1]
 	    	js = strings.Replace(js,
 	    		result[0],
-	    		"static " + something,
+	    		"\nstatic " + something,
 	    		1)
 	    } else {
 	    	break
