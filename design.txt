@@ -1,0 +1,46 @@
+Convert old prototype-based class to syntax-sugary class in several hard steps:
+
+DONE
+Foo.prototype = new Bar(...);
+==>
+remember Bar is the class we're extending
+
+DONE
+add "}" at the end
+
+DONE
+function Foo(blah) {
+==>
+class Foo [extends Bar] {
+  constructor(blah) {
+
+
+DONE
+Bar.call(this, superblah); // super-constructor
+==>
+super(superblah);
+
+DONE
+Foo.prototype = new Bar();
+Foo.prototype.constructor = Foo;
+==>
+<deleted>
+
+DONE
+Bar.prototype.beep.call(this, superblah);
+==>
+super.beep(superblah);
+
+DONE
+Foo.prototype.bar = function(blah) {
+==>
+  bar(blah) {
+
+DONE
+Foo.BLAH
+==>
+static BLAH
+
+DONE
+^}; ==> }
+That's not perfect but it's mostly OK.
